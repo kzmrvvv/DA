@@ -70,7 +70,7 @@
 
 ![6](https://user-images.githubusercontent.com/114439735/201134336-b268951a-33e7-4c02-816d-38af3325c7ce.png)
 
-2.3. Создадим и подключим к RollerAgent скрипт:
+2.3. Создадим и подключим к RollerAgent скрипт
 
 
 
