@@ -42,7 +42,7 @@
 
 ## Задание 1
 ### Реализовать систему машинного обучения в связке Python - Google-Sheets – Unity.
-#### 1. Подготовим среду для работы Python
+#### 1. Подготовка среды для работы Python
 
 1.1. Для оптимизации работы Python создадим виртуальное окружение при помощи Conda Prompt, используя версию Python 3.6.1
 
@@ -52,15 +52,15 @@
 
 ![2](https://user-images.githubusercontent.com/114439735/201132115-c7f2e8f3-51b1-4240-b6ba-d2fbf7db7bc1.png)
 
-1.2. Установим в ml-agents
+1.2. Установим ml-agents
 
 ![3](https://user-images.githubusercontent.com/114439735/201132511-68a4a45c-2f92-43ed-b25e-a5b701bac5d6.png)
 
-1.3. Установим в окружение PyTorch
+1.3. Установим PyTorch
 
 ![4](https://user-images.githubusercontent.com/114439735/201133068-1f2f2894-5431-4c65-abbe-463a5ed7b57c.png)
 
-#### 2. Подготовим проект в Unity
+#### 2. Подготовка проекта в Unity
 
 2.1. Создадим пустой 3D-проект в Unity, добавим на сцену плоскость (Floor), куб (Target) и сферу (RollerAgent), для удобства откорректируем координаты объектов, назначим материалы и сгруппируем эти 3 объекта в объект TargetArea
 
@@ -72,67 +72,147 @@
 
 2.3. Создадим и подключим к RollerAgent скрипт
 
+```cs
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using Unity.MLAgents;
+using Unity.MLAgents.Sensors;
+using Unity.MLAgents.Actuators;
 
+public class RollerAgent : Agent
+{
+    Rigidbody rBody;
+    // Start is called before the first frame update
+    void Start()
+    {
+        rBody = GetComponent<Rigidbody>();
+    }
 
-## Задание 2
-### Должна ли величина loss стремиться к нулю при изменении исходных данных? Ответьте на вопрос, приведите пример выполнения кода, который подтверждает ваш ответ.
+    public Transform Target;
+    public override void OnEpisodeBegin()
+    {
+        if (this.transform.localPosition.y < 0)
+        {
+            this.rBody.angularVelocity = Vector3.zero;
+            this.rBody.velocity = Vector3.zero;
+            this.transform.localPosition = new Vector3(0, 0.5f, 0);
+        }
 
-- Перечисленные в этом туториале действия могут быть выполнены запуском на исполнение скрипт-файла, доступного [в репозитории](https://github.com/Den1sovDm1triy/hfss-scripting/blob/main/ScreatingSphereInAEDT.py).
-- Для запуска скрипт-файла откройте Ansys Electronics Desktop. Перейдите во вкладку [Automation] - [Run Script] - [Выберите файл с именем ScreatingSphereInAEDT.py из репозитория].
+        Target.localPosition = new Vector3(Random.value * 8-4, 0.5f, Random.value * 8-4);
+    }
+    public override void CollectObservations(VectorSensor sensor)
+    {
+        sensor.AddObservation(Target.localPosition);
+        sensor.AddObservation(this.transform.localPosition);
+        sensor.AddObservation(rBody.velocity.x);
+        sensor.AddObservation(rBody.velocity.z);
+    }
+    public float forceMultiplier = 10;
+    public override void OnActionReceived(ActionBuffers actionBuffers)
+    {
+        Vector3 controlSignal = Vector3.zero;
+        controlSignal.x = actionBuffers.ContinuousActions[0];
+        controlSignal.z = actionBuffers.ContinuousActions[1];
+        rBody.AddForce(controlSignal * forceMultiplier);
 
-```py
+        float distanceToTarget = Vector3.Distance(this.transform.localPosition, Target.localPosition);
 
-import ScriptEnv
-ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
-oDesktop.RestoreWindow()
-oProject = oDesktop.NewProject()
-oProject.Rename("C:/Users/denisov.dv/Documents/Ansoft/SphereDIffraction.aedt", True)
-oProject.InsertDesign("HFSS", "HFSSDesign1", "HFSS Terminal Network", "")
-oDesign = oProject.SetActiveDesign("HFSSDesign1")
-oEditor = oDesign.SetActiveEditor("3D Modeler")
-oEditor.CreateSphere(
-	[
-		"NAME:SphereParameters",
-		"XCenter:="		, "0mm",
-		"YCenter:="		, "0mm",
-		"ZCenter:="		, "0mm",
-		"Radius:="		, "1.0770329614269mm"
-	], 
-)
-
+        if(distanceToTarget < 1.42f)
+        {
+            SetReward(1.0f);
+            EndEpisode();
+        }
+        else if (this.transform.localPosition.y < 0)
+        {
+            EndEpisode();
+        }
+    }
+}
 ```
 
-## Задание 3
-### Какова роль параметра Lr? Ответьте на вопрос, приведите пример выполнения кода, который подтверждает ваш ответ. В качестве эксперимента можете изменить значение параметра.
+2.4. Подключим к RollerAgent компоненты Decision Requester, Behavior Parameters, а также настроим эти компоненты следующим образом
 
-- Перечисленные в этом туториале действия могут быть выполнены запуском на исполнение скрипт-файла, доступного [в репозитории](https://github.com/Den1sovDm1triy/hfss-scripting/blob/main/ScreatingSphereInAEDT.py).
-- Для запуска скрипт-файла откройте Ansys Electronics Desktop. Перейдите во вкладку [Automation] - [Run Script] - [Выберите файл с именем ScreatingSphereInAEDT.py из репозитория].
+![7](https://user-images.githubusercontent.com/114439735/201137366-d8d3ac59-36cb-4d0e-9b6b-09be15e2d7b2.png)
 
-```py
+2.5. Добавляем в корневую папку проекта Unity файл конфигурации нейронной сети
 
-import ScriptEnv
-ScriptEnv.Initialize("Ansoft.ElectronicsDesktop")
-oDesktop.RestoreWindow()
-oProject = oDesktop.NewProject()
-oProject.Rename("C:/Users/denisov.dv/Documents/Ansoft/SphereDIffraction.aedt", True)
-oProject.InsertDesign("HFSS", "HFSSDesign1", "HFSS Terminal Network", "")
-oDesign = oProject.SetActiveDesign("HFSSDesign1")
-oEditor = oDesign.SetActiveEditor("3D Modeler")
-oEditor.CreateSphere(
-	[
-		"NAME:SphereParameters",
-		"XCenter:="		, "0mm",
-		"YCenter:="		, "0mm",
-		"ZCenter:="		, "0mm",
-		"Radius:="		, "1.0770329614269mm"
-	], 
-)
-
+```yaml
+behaviors:
+  RollerAgent:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 10
+      buffer_size: 100
+      learning_rate: 3.0e-4
+      beta: 5.0e-4
+      epsilon: 0.2
+      lambd: 0.99
+      num_epoch: 3
+      learning_rate_schedule: linear
+    network_settings:
+      normalize: false
+      hidden_units: 128
+      num_layers: 2
+    reward_signals:
+      extrinsic:
+        gamma: 0.99
+        strength: 1.0
+    max_steps: 500000
+    time_horizon: 64
+    summary_freq: 10000
 ```
+#### 3. Обучение
+
+3.1. Активируем обучение в Conda Prompt, последняя строка кода на скриншоте свидетельствует о том, что можно запускать сцену в Unity 
+
+![8](https://user-images.githubusercontent.com/114439735/201148711-10123720-cb8b-44f5-a781-7c409c4a7571.png)
+
+3.2. Запустим сцену в Unity для одного объекта TargetArea (см. пункт 2.1)
+
+![IMG_0874](https://user-images.githubusercontent.com/114439735/201148094-634ca2cd-0b98-4c49-9e2d-74e20fc43a03.gif)
+
+Результат обучения:
+
+![1](https://user-images.githubusercontent.com/114439735/201149835-8b9d687d-e2d5-4fef-9709-3d8e0df69c1d.png)
+
+3.3. Запустим сцену в Unity для трех объектов TargetArea
+
+![IMG_0875](https://user-images.githubusercontent.com/114439735/201150068-26ba3d16-183a-4b0a-962d-569c39ffae93.gif)
+
+Результат обучения:
+
+![3](https://user-images.githubusercontent.com/114439735/201150390-a0d97ee7-3b41-4849-9029-f1dfc1e4f970.png)
+
+3.4. Запустим сцену в Unity для девяти объектов TargetArea
+
+![IMG_0876](https://user-images.githubusercontent.com/114439735/201150843-da2bddfd-f3eb-49f9-b3b6-83a6f0ebecad.gif)
+
+Результат обучения:
+
+![9](https://user-images.githubusercontent.com/114439735/201150976-d170a5b1-41a0-4104-a43d-00333a597825.png)
+
+3.5. Запустим сцену в Unity для двадцати семи объектов TargetArea
+
+https://user-images.githubusercontent.com/114439735/201152002-8b000baf-f6fc-483c-aeda-fbf5274cafec.mov
+
+Результат обучения:
+
+![27](https://user-images.githubusercontent.com/114439735/201152135-8cd736d7-3df8-4089-8b84-3e0ab7208913.png)
+
+3.6. Как мы видим, с увеличением числа обучающихся объектов увеличивается скорость и качество обучения
+
+#### 4. Проверим работу обученной модели
+
+4.1. Pагрузим файл с результатами обучения ```RollerAgent.onnx``` в папку ```Assets``` директории проекта
+
+4.2. Подключим файл к объекту RollerAgent (компонент Behavior Parameters - Model). Запустим симулицию сцены
+
+[final.webm](https://user-images.githubusercontent.com/114439735/201153113-ce6a0bc2-7f0b-4cc1-b8fb-7dd22ae15a29.webm)
 
 ## Выводы
 
-Абзац умных слов о том, что было сделано и что было узнано.
+В ходе данной лабораторной работы мной были изучены основы интеграции нейронной сети в простой 3D-проект Unity. В результате я получил модель, благодаря которой выполняются заданные условия, для этого было достаточно выполнить 12 обучений за 3 стадии. Игровым балансом называется «равновесие» между персонажами, командами, тактиками игры и другими игровыми объектами. Сложно переоценить роль машинного обучения в проработке баланса современных игр, оно значительно упрощает процесс моделирования искусственного интеллекта в игровых проектах.
 
 | Plugin | README |
 | ------ | ------ |
